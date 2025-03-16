@@ -33,7 +33,6 @@ const useImageUpload = (): UseImageUploadResult => {
 
     const reader = new FileReader();
 
-    // Чтение файла и преобразование в base64
     reader.onload = () => {
       if (reader.result) {
         setImage(reader.result as string);
@@ -46,10 +45,9 @@ const useImageUpload = (): UseImageUploadResult => {
       setIsLoading(false);
     };
 
-    reader.readAsDataURL(file); // Преобразуем файл в base64
+    reader.readAsDataURL(file);
   };
 
-  // Сброс изображения и ошибок
   const resetImage = () => {
     setImage(null);
     setError(null);
