@@ -1,4 +1,4 @@
-import Story from "@/app/types/story.type";
+import Story from "@/types/story.type";
 import { STORIES } from "@/constants/story.constant";
 
 export const loadStoriesFromLocalStorage = (): Promise<Story[]> => {
