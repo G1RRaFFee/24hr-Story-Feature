@@ -1,11 +1,16 @@
 "use client";
-// TODO: Проблема, при загрузке картинки, вызывается рендер StoriesSkeleton
 import { v4 as uuidv4 } from "uuid";
 import Image from "next/image";
 
-import { AvatarImage, AvatarFallback, Avatar } from "@/components/ui/avatar";
 import { Plus } from "lucide-react";
-import { JSX, useCallback, useEffect, useState } from "react";
+import {
+  ChangeEvent,
+  JSX,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,42 +28,22 @@ import {
 } from "@/helpers/story.helper";
 
 import List from "@/components/shared/List";
-import { Button } from "@/components/ui/button";
 import StoryViewer from "@/components/shared/StoryViewer";
-import { ONE_DAY, ONE_MINUTE } from "@/constants/story.constant";
+import { ONE_DAY, ONE_MINUTE, ONE_SECOND } from "@/constants/story.constant";
 import StoriesSkeleton from "@/components/shared/StoriesSkeleton";
+import { StoryItem } from "@/components/shared/StoryItem";
+import AddStoryButton from "@/components/shared/AddStoryButton";
 
 export default function Home(): JSX.Element {
   const [selectedStoryIndex, setSelectedStoryIndex] = useState<number | null>(
     null
   );
   const [stories, setStories] = useState<Story[]>([]);
-  const [isStoriesLoading, setIsStoriesLoading] = useState<boolean>(false);
-
+  const [isStoriesLoading, setIsStoriesLoading] = useState<boolean>(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
-  const [isViewerOpen, setViewerOpen] = useState<boolean>(false);
-  const { image, error, isImageLoading, handleImageUpload, resetImage } =
-    useImageUpload();
-
-  const handleSaveClick = (image: string | null) => {
-    saveImage(image);
-    setIsDialogOpen(false);
-  };
-
-  const saveImage = (image: string | null): void => {
-    if (!image) return;
-
-    const newStory: Story = {
-      id: uuidv4(),
-      isViewed: false,
-      src: image,
-      createdAt: Date.now(),
-    };
-    const updatedStories = [newStory, ...stories];
-
-    saveStoriesToLocalStorage(updatedStories);
-    setStories(updatedStories);
-  };
+  const [isViewerOpen, setIsViewerOpen] = useState<boolean>(false);
+  const { handleImageUpload } = useImageUpload();
 
   useEffect(() => {
     const loadStories = async () => {
@@ -69,7 +54,7 @@ export default function Home(): JSX.Element {
       } finally {
         setTimeout(() => {
           setIsStoriesLoading(false);
-        }, 1000);
+        }, ONE_SECOND);
       }
     };
 
@@ -77,7 +62,7 @@ export default function Home(): JSX.Element {
 
     const cleanUpStories = setInterval(cleanUpExpiresStories, ONE_MINUTE);
     return () => clearInterval(cleanUpStories);
-  }, [image]);
+  }, []);
 
   const cleanUpExpiresStories = useCallback(() => {
     setStories((previousStories) => {
@@ -87,10 +72,58 @@ export default function Home(): JSX.Element {
       if (filteredStories.length !== previousStories.length) {
         saveStoriesToLocalStorage(filteredStories);
       }
-      console.log("clean up");
       return filteredStories;
     });
   }, []);
+
+  const handleStoryClick = useCallback((storyIndex: number) => {
+    setStories((previousStories) => {
+      const updatedStories = previousStories.map((story, index) => {
+        if (index === storyIndex && !story.isViewed) {
+          return { ...story, isViewed: true };
+        }
+
+        return story;
+      });
+
+      saveStoriesToLocalStorage(updatedStories);
+      return updatedStories;
+    });
+
+    setIsViewerOpen(true);
+    setSelectedStoryIndex(storyIndex);
+  }, []);
+
+  const handleAddStoryClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelect = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const uploadedFile = event.target.files?.[0];
+      if (!uploadedFile) return;
+
+      try {
+        const newStory = await handleImageUpload(uploadedFile);
+        if (newStory) {
+          setStories((previousStories) => {
+            const updatedStories = [newStory, ...previousStories];
+            saveStoriesToLocalStorage(updatedStories);
+            return updatedStories;
+          });
+        }
+      } catch (error) {
+        console.log("Error uploading image:", error);
+      }
+
+      setIsDialogOpen(false);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    },
+    [handleImageUpload]
+  );
 
   if (isStoriesLoading) {
     return <StoriesSkeleton />;
@@ -98,34 +131,35 @@ export default function Home(): JSX.Element {
 
   return (
     <main className="font-[family-name:var(--font-geist-sans)] h-full w-xl flex items-center justify-center">
-      <header className="flex items-center gap-2">
-        <button
-          className="p-2 hover:cursor-pointer"
-          onClick={() => setIsDialogOpen(true)}
-        >
-          <Plus size={20} />
-        </button>
-
-        <List<Story>
-          className="flex items-center justify-center gap-2"
-          items={stories}
-          renderItem={(story) => (
-            <Avatar
-              key={story.id}
-              className={`h-12 w-12 hover:cursor-pointer ${
-                story.isViewed ? "opacity-50" : ""
-              }`}
-              onClick={() => {
-                setSelectedStoryIndex(stories.indexOf(story));
-                setViewerOpen(true);
-              }}
-            >
-              <AvatarImage src={story.src} alt="User story" />
-              <AvatarFallback>CN</AvatarFallback>
-            </Avatar>
+      <header>
+        <h1 className="text-2xl">Stories</h1>
+        <p className="text-gray-400">desc.</p>
+        <section className="flex items-center gap-2 mt-4">
+          <button
+            className="hover:cursor-pointer"
+            onClick={() => setIsDialogOpen(true)}
+          >
+            <Plus size={20} />
+          </button>
+          <List<Story>
+            className="flex items-center justify-center gap-2"
+            items={stories}
+            renderItem={(story, index) => (
+              <StoryItem
+                story={story}
+                index={index}
+                onStoryClick={handleStoryClick}
+              />
+            )}
+          />
+          {stories.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <p>No stories yet. Click the + button to add your first story!</p>
+            </div>
           )}
-        />
+        </section>
       </header>
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild />
         <DialogContent>
@@ -133,36 +167,24 @@ export default function Home(): JSX.Element {
             <DialogTitle>Create new Story</DialogTitle>
             <DialogDescription>desc.</DialogDescription>
           </DialogHeader>
-          <h1>Upload an Image</h1>
           <input
             type="file"
-            className="hover:cursor-pointer"
             accept="image/*"
-            onChange={handleImageUpload}
-            disabled={isImageLoading}
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleFileSelect}
           />
-          {isImageLoading && <p>Loading...</p>}
-          {error && <p>{error}</p>}
-          {image && (
-            <div>
-              <h2>Uploaded Image:</h2>
-              <Image
-                height={100}
-                width={100}
-                src={image}
-                alt="Uploaded image"
-              />
-              <div className="flex justify-center items-center gap-2">
-                <Button onClick={resetImage}>Reset Image</Button>
-                <Button onClick={() => handleSaveClick(image)}>Save</Button>
-              </div>
-            </div>
-          )}
+
+          <AddStoryButton
+            item={<Plus size={20} />}
+            onClick={handleAddStoryClick}
+          />
         </DialogContent>
       </Dialog>
+
       {selectedStoryIndex !== null && isViewerOpen && (
         <StoryViewer
-          setViewerOpen={setViewerOpen}
+          setViewerOpen={setIsViewerOpen}
           isViewerOpen={isViewerOpen}
           stories={stories}
           initialIndex={selectedStoryIndex}

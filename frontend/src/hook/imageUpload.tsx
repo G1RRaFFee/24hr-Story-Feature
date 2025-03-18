@@ -1,62 +1,49 @@
 "use client";
 
-import { ChangeEvent, useCallback, useState } from "react";
+import { useCallback } from "react";
+import Story from "@/types/story.type";
 
-interface UseImageUploadResult {
-  image: string | null;
-  error: string | null;
-  isImageLoading: boolean;
-  handleImageUpload: (event: ChangeEvent<HTMLInputElement>) => void;
-  resetImage: () => void;
-}
-
-const useImageUpload = (): UseImageUploadResult => {
-  const [image, setImage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isImageLoading, setIsImageLoading] = useState<boolean>(false);
-
+const useImageUpload = () => {
   const handleImageUpload = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-
-      if (!file) {
-        setError("No file selected.");
-        return;
-      }
-
+    async (file: File): Promise<Story | null> => {
       if (!file.type.startsWith("image/")) {
-        setError("Please upload an image file.");
-        return;
+        throw new Error("Please select an image file");
       }
 
-      setIsImageLoading(true);
-      setError(null);
+      const img = new Image();
+      const imageUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.readAsDataURL(file);
+      });
 
-      const reader = new FileReader();
+      img.src = imageUrl;
+      await new Promise((resolve) => {
+        img.onload = resolve;
+      });
 
-      reader.onload = () => {
-        if (reader.result) {
-          setImage(reader.result as string);
-        }
-        setIsImageLoading(false);
+      let finalImageUrl = imageUrl;
+      if (img.width > 1080 || img.height > 1920) {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const ratio = Math.min(1080 / img.width, 1920 / img.height);
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        finalImageUrl = canvas.toDataURL("image/jpeg", 0.9);
+      }
+
+      return {
+        id: Date.now().toString(),
+        src: finalImageUrl,
+        createdAt: Date.now(),
+        isViewed: false,
       };
-
-      reader.onerror = () => {
-        setError("Failed to read the file.");
-        setIsImageLoading(false);
-      };
-
-      reader.readAsDataURL(file);
     },
     []
   );
 
-  const resetImage = () => {
-    setImage(null);
-    setError(null);
-  };
-
-  return { image, error, isImageLoading, handleImageUpload, resetImage };
+  return { handleImageUpload };
 };
 
 export default useImageUpload;

@@ -1,5 +1,3 @@
-// FIXME: Пофиксить проблемы с StoryViewer, проблему с IsViewed
-
 "use client";
 
 import { JSX, useEffect, useState } from "react";
@@ -11,6 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from "../ui/dialog";
 import ProgressBar from "./ProgressBar";
 import Story from "@/types/story.type";
@@ -84,24 +84,29 @@ const StoryViewer = ({
     >
       <DialogTrigger asChild />
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Story Viewer</DialogTitle>
-        </DialogHeader>
         <ProgressBar
+          className="mt-7"
           duration={STORY_DURATION}
           segments={stories.length}
           currentSegment={currentStoryIndex}
           initialProgress={progress}
           onSegmentComplete={handleSegmentComplete}
         />
-        {stories.length > 0 && stories[currentStoryIndex]?.src && (
-          <Image
-            height={500}
-            width={300}
-            src={stories[currentStoryIndex].src}
-            alt="Story"
-          />
-        )}
+        <section className="flex justify-between">
+          <DialogHeader>
+            <DialogTitle>Story Viewer</DialogTitle>
+            <DialogDescription>desc.</DialogDescription>
+          </DialogHeader>
+          {stories.length > 0 && stories[currentStoryIndex]?.src && (
+            <Image
+              loading="lazy"
+              height={500}
+              width={300}
+              src={stories[currentStoryIndex].src}
+              alt="Story"
+            />
+          )}
+        </section>
       </DialogContent>
     </Dialog>
   );
